@@ -71,7 +71,7 @@ class Fork {
         return $this;
     }
 
-    public function run(callable ...$callables): void {
+    public function run(array $callables): void {
         $this->queue = [];
         foreach ($callables as $order => $callable) {
             $this->queue[] = new Task($callable, $order);
@@ -81,15 +81,14 @@ class Fork {
         pcntl_signal(\SIGINT, fn() => $this->exit());
         pcntl_signal(\SIGQUIT, fn() => $this->exit());
         pcntl_signal(\SIGTERM, fn() => $this->exit());
-        pcntl_signal(\SIGCHLD, fn() => $this->onChildExit());
         pcntl_signal(\SIGALRM, fn() => $this->onChildTimeout());
+
         if (self::$mainPID === getmypid()) {
             self::$shutdownHandler->enable();
         } else {
             // Can't test coverage on this because it'd happen in a fork
             self::$shutdownHandler->disable(); // @codeCoverageIgnore
         }
-
 
         foreach ($this->queue as $task) {
             $position = $task->getPosition();
@@ -101,14 +100,30 @@ class Fork {
             }
         }
 
-        while (count($this->runningTasks) > 0) {}
+        while (count($this->runningTasks) > 0) {
+            // Should be able to execute this on a SIGCHLD signal, but it doesn't always
+            // work for some reason; it's going here instead
+            foreach ($this->runningTasks as $task) {
+                if (!$task->hasExited()) {
+                    continue;
+                }
+
+                if ($this->onParentAfter) {
+                    ($this->onParentAfter)($task->getOutput());
+                }
+
+                unset($this->runningTasks[$task->getPosition()]);
+                if (count($this->queue) > 0) {
+                    $this->runningTasks[] = $this->runTask(array_shift($this->queue));
+                }
+            }
+        }
 
         // Clean up
         self::$shutdownHandler->disable();
         pcntl_signal(\SIGINT, \SIG_DFL);
         pcntl_signal(\SIGQUIT, \SIG_DFL);
         pcntl_signal(\SIGTERM, \SIG_DFL);
-        pcntl_signal(\SIGCHLD, \SIG_DFL);
         pcntl_signal(\SIGALRM, \SIG_DFL);
     }
 
@@ -129,23 +144,6 @@ class Fork {
         $this->stop();
         self::$shutdownHandler->disable();
         posix_kill(self::$mainPID, \SIGKILL);
-    }
-
-    protected function onChildExit(): void {
-        foreach ($this->runningTasks as $task) {
-            if (!$task->hasExited()) {
-                continue;
-            }
-
-            if ($this->onParentAfter) {
-                ($this->onParentAfter)($task->getOutput());
-            }
-
-            unset($this->runningTasks[$task->getPosition()]);
-            if (count($this->queue) > 0) {
-                $this->runningTasks[] = $this->runTask(array_shift($this->queue));
-            }
-        }
     }
 
     protected function onChildTimeout(): void {

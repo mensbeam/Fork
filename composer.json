@@ -26,6 +26,7 @@
         "mensbeam/self-sealing-callable": "^1.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "^11.0"
+        "phpunit/phpunit": "^11.0",
+        "spatie/fork": "^1.2"
     }
 }
