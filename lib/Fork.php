@@ -24,8 +24,8 @@ class Fork {
     protected ?\Closure $onChildBefore = null;
     protected ?\Closure $onParentAfter = null;
     protected ?\Closure $onParentBefore = null;
-    /** @var Task[] */
-    protected array $queue = [];
+    /** @var \Iterator<int, Task> */
+    protected \Iterator $queue;
     /** @var Task[] */
     protected array $runningTasks = [];
     protected static ?SelfSealingCallable $shutdownHandler = null;
@@ -71,11 +71,8 @@ class Fork {
         return $this;
     }
 
-    public function run(array $callables): void {
-        $this->queue = [];
-        foreach ($callables as $order => $callable) {
-            $this->queue[] = new Task($callable, $order);
-        }
+    public function run(array|\Iterator $callables): void {
+        $this->queue = (is_array($callables)) ? new \ArrayIterator($callables) : $callables;
 
         pcntl_async_signals(true);
         pcntl_signal(\SIGINT, fn() => $this->exit());
@@ -90,20 +87,19 @@ class Fork {
             self::$shutdownHandler->disable(); // @codeCoverageIgnore
         }
 
-        foreach ($this->queue as $task) {
-            $position = $task->getPosition();
-            $this->runningTasks[$position] = $this->runTask($task);
-            unset($this->queue[$position]);
+        foreach ($this->queue as $key => $callable) {
+            $task = new Task($callable, $key);
+            $this->runningTasks[$key] = $this->runTask($task);
+
             // If the concurrency limit has been reached then break out of the queue
             if ($this->concurrent && count($this->runningTasks) >= $this->concurrent) {
                 break;
             }
         }
 
+
         while (count($this->runningTasks) > 0) {
-            // Should be able to execute this on a SIGCHLD signal, but it doesn't always
-            // work for some reason; it's going here instead
-            foreach ($this->runningTasks as $task) {
+            foreach ($this->runningTasks as $key => $task) {
                 if (!$task->hasExited()) {
                     continue;
                 }
@@ -112,10 +108,17 @@ class Fork {
                     ($this->onParentAfter)($task->getOutput());
                 }
 
-                unset($this->runningTasks[$task->getPosition()]);
-                if (count($this->queue) > 0) {
-                    $this->runningTasks[] = $this->runTask(array_shift($this->queue));
+                unset($this->runningTasks[$key]);
+                if ($this->queue instanceof \ArrayAccess) {
+                    unset($this->queue[$key]);
                 }
+
+                $this->queue->next();
+                if (!$this->queue->valid()) {
+                    continue;
+                }
+
+                $this->runningTasks[] = $this->runTask(new Task($this->queue->current(), $this->queue->key()));
             }
         }
 
@@ -128,7 +131,7 @@ class Fork {
     }
 
     public function stop(): void {
-        $this->queue = [];
+        $this->queue = new \ArrayIterator();
         foreach ($this->runningTasks as $task) {
             posix_kill($task->getPid(), \SIGKILL);
         }

@@ -14,16 +14,14 @@ class Task {
     protected bool $exited = false;
     protected ?array $output = null;
     protected int $pid = -1;
-    protected int $position;
     protected ?Socket $socket = null;
     protected bool $successfullyExited = false;
 
 
 
 
-    public function __construct(callable $callable, int $position) {
+    public function __construct(callable $callable) {
         $this->closure = ($callable instanceof \Closure) ? $callable : \Closure::fromCallable($callable);
-        $this->position = $position;
     }
 
 
@@ -38,8 +36,6 @@ class Task {
         if ($this->output !== null) {
             return $this->output;
         }
-
-        // Handle null output?
 
         $output = '';
         foreach ($this->socket->read() as $buffer) {
@@ -56,10 +52,6 @@ class Task {
             'success' => $this->successfullyExited,
             'data' => $output
         ];
-    }
-
-    public function getPosition(): int {
-        return $this->position;
     }
 
     public function getPid(): int {
