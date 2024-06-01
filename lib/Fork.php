@@ -42,6 +42,8 @@ class Fork {
             self::$shutdownHandler = new SelfSealingCallable(fn() => $this->stop());
             register_shutdown_function(self::$shutdownHandler);
         }
+
+        $this->queue = new \ArrayIterator();
     }
 
 
@@ -96,7 +98,6 @@ class Fork {
                 break;
             }
         }
-
 
         while (count($this->runningTasks) > 0) {
             foreach ($this->runningTasks as $key => $task) {
