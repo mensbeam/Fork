@@ -9,12 +9,13 @@ declare(strict_types=1);
 namespace MensBeam\Fork;
 
 
-class ThrowableWrapper {
+class ThrowableContext {
     protected int $code;
     protected string $file = '';
     protected int $line;
     protected string $message = '';
     protected ?self $previous = null;
+    protected string $type = '';
 
 
 
@@ -23,6 +24,7 @@ class ThrowableWrapper {
         $this->code = $throwable->getCode();
         $this->file = $throwable->getFile();
         $this->message = $throwable->getMessage();
+        $this->type = $throwable::class;
 
         $previous = $throwable->getPrevious();
         $this->previous = ($previous !== null) ? new self($previous) : null;

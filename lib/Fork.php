@@ -10,7 +10,7 @@ namespace MensBeam;
 use MensBeam\Fork\{
     Socket,
     Task,
-    ThrowableWrapper,
+    ThrowableContext,
     TimeoutException,
     RuntimeException
 };
@@ -190,7 +190,7 @@ class Fork {
                     ($this->onChildAfter)($output);
                 }
             } catch (\Throwable $t) {
-                $output = new ThrowableWrapper($t);
+                $output = new ThrowableContext($t);
                 $throwable = $t;
             }
 
