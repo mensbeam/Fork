@@ -31,7 +31,7 @@ Here is a simple example. `Fork->run` can be fed an array or an `\Iterator` of c
 ```php
 use MensBeam\Fork;
 
-function taskGenerator(): \Generator {
+function gen(): \Generator {
     foreach (range(1, 5) as $n) {
         yield function () use ($n) {
             $delay = rand(1, 5);
@@ -43,7 +43,7 @@ function taskGenerator(): \Generator {
 
 (new Fork())->after(function(array $output) {
     echo "{$output['data'][0]}: {$output['data'][1]}\n";
-})->run(taskGenerator());
+})->run(gen());
 ```
 
 Output:
