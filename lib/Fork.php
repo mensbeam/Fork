@@ -110,11 +110,13 @@ class Fork {
                 }
 
                 unset($this->runningTasks[$key]);
+
+                $qKey = $this->queue->key();
+                $this->queue->next();
                 if ($this->queue instanceof \ArrayAccess) {
-                    unset($this->queue[$key]);
+                    unset($this->queue[$qKey]);
                 }
 
-                $this->queue->next();
                 if (!$this->queue->valid()) {
                     continue;
                 }
