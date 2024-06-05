@@ -24,7 +24,7 @@ class Fork {
     protected ?\Closure $onChildBefore = null;
     protected ?\Closure $onParentAfter = null;
     protected ?\Closure $onParentBefore = null;
-    /** @var \Iterator<int, Task> */
+    /** @var \Iterator<int|string, Task> */
     protected \Iterator $queue;
     /** @var Task[] */
     protected array $runningTasks = [];
@@ -145,7 +145,7 @@ class Fork {
         return $this;
     }
 
-
+    /** @codeCoverageIgnore */
     protected function exit(): void {
         $this->stop();
         self::$shutdownHandler->disable();

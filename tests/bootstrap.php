@@ -9,10 +9,6 @@ error_reporting(\E_ALL);
 define('CWD', dirname(__DIR__));
 require_once CWD . '/vendor/autoload.php';
 
-if (function_exists('xdebug_set_filter')) {
-    if (defined('XDEBUG_PATH_INCLUDE')) {
-        xdebug_set_filter(\XDEBUG_FILTER_CODE_COVERAGE, \XDEBUG_PATH_INCLUDE, [ CWD . '/lib/' ]);
-    } else {
-        xdebug_set_filter(\XDEBUG_FILTER_CODE_COVERAGE, \XDEBUG_PATH_WHITELIST, [ CWD . '/lib/' ]);
-    }
+if (function_exists('xdebug_set_filter') && defined('XDEBUG_FILTER_CODE_COVERAGE')) {
+    xdebug_set_filter(\XDEBUG_FILTER_CODE_COVERAGE, (defined('XDEBUG_PATH_INCLUDE')) ? \XDEBUG_PATH_INCLUDE : \XDEBUG_PATH_WHITELIST, [ CWD . '/lib/' ]);
 }

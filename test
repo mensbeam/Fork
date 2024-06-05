@@ -10,7 +10,6 @@ $dir = ini_get('extension_dir');
 $php = escapeshellarg(\PHP_BINARY);
 $code = escapeshellarg(__DIR__ . '/lib');
 
-
 array_shift($argv);
 foreach ($argv as $k => $v) {
     if (in_array($v, ['--coverage', '--coverage-html'])) {
@@ -23,13 +22,32 @@ $cmd = [
     '-d opcache.enable_cli=0',
 ];
 
-if (!extension_loaded('xdebug')) {
-    $cmd[] = '-d zend_extension=xdebug.so';
+$pcovLoaded = extension_loaded('pcov');
+$xdebugLoaded = extension_loaded('xdebug');
+
+if (!$pcovLoaded && !$xdebugLoaded) {
+    $extDir = ini_get('extension_dir');
+    if (!extension_loaded('pcov') && file_exists("$extDir/pcov.so")) {
+        $cmd[] = '-d extension=pcov.so';
+        $pcovLoaded = true;
+    } elseif (!extension_loaded('xdebug') && file_exists("$extDir/xdebug.so")) {
+        $cmd[] = '-d zend_extension=xdebug.so';
+        $xdebugLoaded = true;
+    }
+}
+
+if ($pcovLoaded) {
+    $cmd[] = '-d pcov.enabled=1';
+    $cmd[] = "-d pcov.directory=$code";
+} elseif ($xdebugLoaded) {
+    $cmd[] = '-d xdebug.mode=coverage,develop,trace';
+} else {
+    fwrite(\STDERR, "Either the pcov or xdebug extension is required to run tests.\n");
+    exit(1);
 }
 
 $cmd = implode(' ', [
     ...$cmd,
-    '-d xdebug.mode=coverage,develop,trace',
     escapeshellarg(__DIR__ . '/vendor/bin/phpunit'),
     '--configuration tests/phpunit.xml',
     ...$argv,
