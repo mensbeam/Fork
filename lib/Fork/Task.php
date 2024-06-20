@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace MensBeam\Fork;
 
 
+/** @internal */
 class Task {
     protected \Closure $closure;
     protected bool $exited = false;
@@ -78,7 +79,7 @@ class Task {
             return true;
         }
         if ($status !== 0) {
-            throw new RuntimeException("Process id {$this->pid} was unsuccessfully handled");
+            throw new ForkException("Process id {$this->pid} was unsuccessfully handled");
         }
 
         return false;

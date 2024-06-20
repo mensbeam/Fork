@@ -8,4 +8,11 @@
 declare(strict_types=1);
 namespace MensBeam\Fork;
 
-class TimeoutException extends RuntimeException {}
+
+/**
+ * TimeoutException is thrown when a forked process times out.
+ *
+ * This exception is used to indicate that a forked process has exceeded its
+ * allotted execution time.
+ */
+class TimeoutException extends ForkException {}

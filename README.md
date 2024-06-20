@@ -7,7 +7,7 @@
 
 _Fork_ is a library for running jobs concurrently in PHP. It works by forking the main process into separate tasks using php's [`pcntl`][a] and [`sockets`][b] extensions. So, it should go without saying that this library will not work in Windows.
 
-There is an existing library for forking processes, [spatie/fork][c]. This library on its surface is very similar, but internally it's quite a bit different. _Fork_ also doesn't return an array of returned values from the task. When attempting to use `spatie/fork` ourselves we ran into many situations where if there were lots of jobs out of memory errors would occur because the output array would be enormous. It's better to handle output as tasks end in the main process instead of everything at the end.
+There is an existing library for forking processes, [spatie/fork][c]. This library on its surface is very similar, but internally it's quite a bit different. Unlike `spatie/fork`, `mensbeam/fork` doesn't return an array of returned values from the task. When attempting to use `spatie/fork` ourselves we ran into many situations where if there were lots of tasks out of memory errors would occur because the output array would be enormous. It's better to handle output as tasks end in the main process instead of everything at the end.
 
 ## Requirements ##
 

@@ -169,11 +169,11 @@ class TestFork extends TestCase {
         yield [ $iterable ];
 
         // Convert the array to an associative array by hashing the keys, then yield
-        $iterable2 = [];
+        $array = [];
         foreach ($iterable as $key => $value) {
-            $iterable2[md5((string)$key)] = $value;
+            $array[md5((string)$key)] = $value;
         }
-        yield [ $iterable2 ];
+        yield [ $array ];
 
         // Yield an ArrayIterator object
         yield [ new \ArrayIterator($iterable) ];

@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace MensBeam\Fork;
 
 
+/** @internal */
 class Socket {
     protected \Socket $socket;
 
@@ -18,6 +19,8 @@ class Socket {
         socket_set_nonblock($socket);
         $this->socket = $socket;
     }
+
+
 
 
     public function close(): void {
