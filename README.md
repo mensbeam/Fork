@@ -190,4 +190,4 @@ Ook!
 
 ## License
 
-MIT License. See <LICENSE.md> and <AUTHORS.md> for details.
+MIT License. See [LICENSE.md](LICENSE.md) and [AUTHORS.md](AUTHORS.md) for details.
