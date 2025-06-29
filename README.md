@@ -166,7 +166,7 @@ Fork::$tracesInThrowableContexts = true;
 
 ## Throwing exceptions inside the fork
 
-By default, exceptions inside child processes are caught and sent as `ThrowableContext` objects. If you'd like them to be **thrown and crash the child process** (for debugging or crash reporting), set:
+By default, exceptions inside child processes are caught and sent as `ThrowableContext` objects. If you'd like them to be **thrown, crash the child process, and therefore be printed** (for debugging or crash reporting), set:
 
 ```php
 use MensBeam\Fork;
@@ -190,4 +190,4 @@ Ook!
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) and [AUTHORS](AUTHORS) for details.
+MIT License. See <LICENSE.md> and <AUTHORS.md> for details.
