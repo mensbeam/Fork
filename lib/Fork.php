@@ -7,6 +7,7 @@
 
 declare(strict_types=1);
 namespace MensBeam;
+
 use MensBeam\Fork\{
     Socket,
     Task,
@@ -16,28 +17,60 @@ use MensBeam\Fork\{
 };
 use MensBeam\SelfSealingCallable;
 
-
 /**
  * Runs tasks by forking processes. It allows for parallel execution of tasks by
- * creating child processes.
+ * creating child processes and managing them, including concurrency control,
+ * timeouts, and optional callbacks.
  */
 class Fork {
+    /** If true, throws exceptions in the forked child process */
+    public static bool $throwInFork = false;
+
+    /** If true, includes stack traces in ThrowableContext serialization */
+    public static bool $tracesInThrowableContexts = false;
+
+    /** Maximum number of concurrent tasks allowed */
     protected ?int $concurrent = null;
+
+    /** Process ID of the main (parent) process */
     protected static ?int $mainPID = null;
+
+    /** Callable to run in child after task execution */
     protected ?\Closure $onChildAfter = null;
+
+    /** Callable to run in child before task execution */
     protected ?\Closure $onChildBefore = null;
+
+    /** Callable to run in parent after task execution */
     protected ?\Closure $onParentAfter = null;
+
+    /** Callable to run in parent before task execution */
     protected ?\Closure $onParentBefore = null;
-    /** @var \Iterator<int|string, Task> */
+
+    /**
+     * The task queue to be executed
+     *
+     * @var \Iterator<int|string, Task>
+     */
     protected \Iterator $queue;
-    /** @var Task[] */
+
+    /**
+     * Currently running tasks mapped by key
+     *
+     * @var Task[]
+     */
     protected array $runningTasks = [];
+
+    /** Shutdown handler for cleaning up on script exit */
     protected static ?SelfSealingCallable $shutdownHandler = null;
+
+    /** Timeout in seconds for each child task */
     protected int $timeout = 3600;
 
 
 
 
+    /** Constructs a new Fork instance and initializes state */
     public function __construct() {
         if (self::$mainPID === null) {
             self::$mainPID = getmypid();
@@ -51,23 +84,15 @@ class Fork {
         $this->queue = new \ArrayIterator();
     }
 
-
-
-
     /**
-     * Registers callables to be run after each task has completed, either within the
-     * child or parent process.
+     * Registers callables to be run after each task completes, in parent or child
      *
-     * This method allows you to specify actions that should be executed after each
-     * task has completed. The provided callables will be invoked in their respective
-     * processes (parent or child) after each task.
+     * @param callable|null $parent A callable to run in the parent process after the task
+     * @param callable|null $child A callable to run in the child process after the task
      *
-     * @param callable|null $parent A callable to run in the parent process after the task has completed
-     * @param callable|null $child A callable to run in the child process after the task has completed
-     *
-     * @return MensBeam\Fork Returns the instance of the Fork class for method chaining.
+     * @return self Returns this Fork instance for method chaining
      */
-    public function after(callable $parent = null, callable $child = null): self {
+    public function after(?callable $parent = null, ?callable $child = null): self {
         if ($child !== null) {
             $this->onChildAfter = ($child instanceof \Closure) ? $child : \Closure::fromCallable($child);
         }
@@ -78,19 +103,14 @@ class Fork {
     }
 
     /**
-     * Registers callables to be run before each task has started, either within the
-     * child or parent process.
+     * Registers callables to be run before each task starts, in parent or child
      *
-     * This method allows you to specify actions that should be executed before each
-     * task has started. The provided callables will be invoked in their respective
-     * processes (parent or child) before each task.
+     * @param callable|null $parent A callable to run in the parent process before the task
+     * @param callable|null $child A callable to run in the child process before the task
      *
-     * @param callable|null $parent A callable to run in the parent process before the task has started
-     * @param callable|null $child A callable to run in the child process before the task has started
-     *
-     * @return MensBeam\Fork Returns the instance of the Fork class for method chaining.
+     * @return self Returns this Fork instance for method chaining
      */
-    public function before(callable $parent = null, callable $child = null): self {
+    public function before(?callable $parent = null, ?callable $child = null): self {
         if ($child !== null) {
             $this->onChildBefore = ($child instanceof \Closure) ? $child : \Closure::fromCallable($child);
         }
@@ -101,16 +121,12 @@ class Fork {
     }
 
     /**
-     * Sets the maximum number of tasks to run concurrently.
+     * Sets the maximum number of concurrent forked tasks
      *
-     * This method allows you to specify the maximum number of forked tasks that can
-     * be executed at the same time. Once the limit is reached, additional tasks will
-     * be queued until a running task completes.
+     * @param int $limit The maximum number of concurrent tasks (>= 0)
      *
-     * @param int $limit The maximum number of concurrent tasks
-     *
-     * @throws \InvalidArgumentException If the $seconds argument is less than 0.
-     * @return MensBeam\Fork Returns the instance of the Fork class for method chaining.
+     * @throws \InvalidArgumentException If $limit is less than 0
+     * @return self Returns this Fork instance for method chaining
      */
     public function concurrent(int $limit): self {
         if ($limit < 0) {
@@ -121,13 +137,11 @@ class Fork {
     }
 
     /**
-     * Runs the provided callables concurrently by forking a process for each callable.
+     * Runs the provided callables as forked tasks with optional concurrency control
      *
-     * The provided callables will be executed in their own child processes
-     * concurrently. The parent process will wait for all children to complete before
-     * continuing.
+     * @param callable[]|\Iterator<int|string, callable> $callables The callables to run
      *
-     * @param callable[]|\Iterator<int|string, callable> $callables The callables to run in forked process
+     * @return void
      */
     public function run(array|\Iterator $callables): void {
         $this->queue = (is_array($callables)) ? new \ArrayIterator($callables) : $callables;
@@ -136,12 +150,10 @@ class Fork {
         pcntl_signal(\SIGINT, fn() => $this->exit());
         pcntl_signal(\SIGQUIT, fn() => $this->exit());
         pcntl_signal(\SIGTERM, fn() => $this->exit());
-        pcntl_signal(\SIGALRM, fn() => $this->onChildTimeout());
 
         if (self::$mainPID === getmypid()) {
             self::$shutdownHandler->enable();
         } else {
-            // Can't test coverage on this because it'd happen in a fork
             self::$shutdownHandler->disable(); // @codeCoverageIgnore
         }
 
@@ -149,7 +161,6 @@ class Fork {
             $task = new Task($callable, $key);
             $this->runningTasks[$key] = $this->runTask($task);
 
-            // If the concurrency limit has been reached then break out of the queue
             if ($this->concurrent && count($this->runningTasks) >= $this->concurrent) {
                 break;
             }
@@ -181,19 +192,16 @@ class Fork {
             }
         }
 
-        // Clean up
         self::$shutdownHandler->disable();
         pcntl_signal(\SIGINT, \SIG_DFL);
         pcntl_signal(\SIGQUIT, \SIG_DFL);
         pcntl_signal(\SIGTERM, \SIG_DFL);
-        pcntl_signal(\SIGALRM, \SIG_DFL);
     }
 
     /**
-     * Stops all forked tasks immediately.
+     * Stops all running forked tasks by clearing the queue and sending SIGKILL
      *
-     * This method clears the task queue and sends a SIGKILL signal to all currently
-     * running tasks, effectively terminating them.
+     * @return void
      */
     public function stop(): void {
         $this->queue = new \ArrayIterator();
@@ -203,16 +211,12 @@ class Fork {
     }
 
     /**
-     * Sets the timeout for forked processes.
+     * Sets the timeout in seconds for child processes
      *
-     * This method configures a timeout duration in seconds for the forked processes.
-     * If the specified time is reached, a SIGALRM signal will be sent to the process
-     * to trigger a timeout.
+     * @param int $seconds Timeout in seconds (>= 0)
      *
-     * @param int $seconds The number of seconds before timing out the process. Must be greater than or equal to 0.
-     *
-     * @throws \InvalidArgumentException If the $seconds argument is less than 0.
-     * @return MensBeam\Fork Returns the instance of the Fork class for method chaining.
+     * @throws \InvalidArgumentException If $seconds is less than 0
+     * @return self Returns this Fork instance for method chaining
      */
     public function timeout(int $seconds): self {
         if ($seconds < 0) {
@@ -222,7 +226,6 @@ class Fork {
         return $this;
     }
 
-
     /** @codeCoverageIgnore */
     protected function exit(): void {
         $this->stop();
@@ -230,11 +233,20 @@ class Fork {
         posix_kill(self::$mainPID, \SIGKILL);
     }
 
+    /** @codeCoverageIgnore */
     protected function onChildTimeout(): void {
         throw new TimeoutException('Task timed out');
     }
 
-    /** @codeCoverageIgnore */
+    /**
+     * Prepares output for sending through the socket, serializing if needed
+     *
+     * @param mixed $output The output to prepare
+     *
+     * @return string The prepared (possibly serialized) string output
+     *
+     * @codeCoverageIgnore
+     */
     protected function prepareOutput(mixed $output): string {
         if (!is_string($output)) {
             $output = "\0\0serialized\0\0:" . serialize($output);
@@ -242,7 +254,16 @@ class Fork {
         return $output;
     }
 
-    protected function runTask(Task $task) {
+    /**
+     * Runs a task in a forked child process and sets up communication sockets
+     *
+     * @param Task $task The task instance to run
+     *
+     * @return Task The configured task with PID and socket
+     *
+     * @throws ForkException If the fork could not be created
+     */
+    protected function runTask(Task $task): Task {
         if ($this->onParentBefore) {
             ($this->onParentBefore)();
         }
@@ -253,10 +274,10 @@ class Fork {
         if ($pid === -1) {
             throw new ForkException('Could not create fork'); // @codeCoverageIgnore
         } elseif ($pid === 0) {
-            // $pid is 0 if in child process
             // @codeCoverageIgnoreStart
             self::$shutdownHandler->disable();
             $socketParentToChild->close();
+            pcntl_signal(\SIGALRM, fn() => $this->onChildTimeout());
             pcntl_alarm($this->timeout);
 
             $throwable = null;
@@ -275,9 +296,11 @@ class Fork {
                 $throwable = $t;
             }
 
+            pcntl_signal(\SIGALRM, \SIG_DFL);
+
             $socketChildToParent->write($this->prepareOutput($output));
             $socketChildToParent->close();
-            if ($throwable !== null) {
+            if (self::$throwInFork && $throwable !== null) {
                 throw $throwable;
             }
             exit();
