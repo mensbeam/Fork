@@ -162,6 +162,8 @@ use MensBeam\Fork;
 Fork::$tracesInThrowableContexts = true;
 ```
 
+Keep in mind there are some minor limitations, however. Anything that can't be serialized such as Generators, Closures, etc. are all sanitized to strings denoting what they were before being replaced.
+
 ---
 
 ## Throwing exceptions inside the fork
