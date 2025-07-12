@@ -27,7 +27,6 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0",
-        "spatie/fork": "^1.2",
         "phake/phake": "^4.5"
     }
 }
